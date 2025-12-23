@@ -106,8 +106,8 @@ workflow-automation-engine/
 Phase 1 is entirely test-driven.
 
 ### 📦 Requirements 
--Python 3.10+
--pytest
+- Python 3.10+
+- pytest
 
 ### 🔧 Install Dependencies
 ```bash
