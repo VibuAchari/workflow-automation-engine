@@ -163,3 +163,71 @@ def transition_case(
                 str(facts),  # JSON serialization comes later
             ),
         )
+def execute_transition(
+    *,
+    case_id: str,
+    action: str,
+    facts: dict,
+) -> dict:
+    """
+    Public Transition Engine entry point.
+
+    This function:
+    - Loads current state internally
+    - Maps 'action' → target state
+    - Delegates to transition_case
+    - Returns a structured result for orchestrators
+
+    Orchestrators MUST call this function.
+    """
+
+    # ---------------------------------------------------------------------
+    # 1. Load current state (internal concern)
+    # ---------------------------------------------------------------------
+    # NOTE: This assumes a DB accessor exists.
+    # If not yet implemented, stub it for now.
+    from db.database import get_connection
+
+    db_conn = get_connection()
+
+    cursor = db_conn.execute(
+        "SELECT current_state FROM cases WHERE id = ?",
+        (case_id,)
+    )
+    row = cursor.fetchone()
+
+    if not row:
+        raise Exception(f"Case not found: {case_id}")
+
+    from_state_value = row[0]
+
+    # Convert string → CaseState enum
+    from core.state import CaseState
+    from_state = CaseState(from_state_value)
+    to_state = CaseState(action)
+
+    # ---------------------------------------------------------------------
+    # 2. Delegate to core transition authority
+    # ---------------------------------------------------------------------
+    transition_case(
+        case_id=case_id,
+        from_state=from_state,
+        to_state=to_state,
+        facts=facts,
+        reason=f"Orchestrated transition to {action}",
+        db_conn=db_conn,
+    )
+
+    # ---------------------------------------------------------------------
+    # 3. Return structured result
+    # ---------------------------------------------------------------------
+    return {
+        "new_state": to_state.value,
+        "status": "SUCCESS",
+        "audit_entry": {
+            "case_id": case_id,
+            "from_state": from_state.value,
+            "to_state": to_state.value,
+            "reason": f"Orchestrated transition to {action}",
+        }
+    }
